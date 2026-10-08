@@ -2,6 +2,7 @@ import { Icon, type IconName } from "@/components/general/Icon";
 import { Text, useThemeColor } from "@/components/general/Themed";
 import { RecentCard } from "@/components/home/RecentCard";
 import { ToolTile } from "@/components/home/ToolTile";
+import * as ImagePicker from 'expo-image-picker';
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -37,6 +38,20 @@ export default function Index() {
   const card = useThemeColor({}, "card");
   const border = useThemeColor({}, "border");
 
+  const pickImageAsync = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      console.log(result);
+    } else {
+      alert('You did not select any image.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -70,6 +85,7 @@ export default function Index() {
             <Pressable
               accessibilityRole="button"
               style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.85 : 1 }]}
+              onPress={pickImageAsync}
             >
               <Icon name={{ ios: "photo.on.rectangle", android: "photo_library" }} color="#1a1a2e" size={18} />
               <Text style={styles.primaryButtonText}>Open Gallery</Text>
