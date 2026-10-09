@@ -3,6 +3,7 @@ import { Text, useThemeColor } from "@/components/general/Themed";
 import { RecentCard } from "@/components/home/RecentCard";
 import { ToolTile } from "@/components/home/ToolTile";
 import * as ImagePicker from 'expo-image-picker';
+import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -38,6 +39,10 @@ export default function Index() {
   const card = useThemeColor({}, "card");
   const border = useThemeColor({}, "border");
 
+  const openEditor = (uri: string) => {
+    router.push({ pathname: '/editor', params:{ uri } })
+  }
+
   const pickImageAsync = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -47,6 +52,7 @@ export default function Index() {
 
     if (!result.canceled) {
       console.log(result);
+      openEditor(result.assets[0].uri)
     } else {
       alert('You did not select any image.');
     }
