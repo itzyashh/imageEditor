@@ -32,7 +32,7 @@ const CORNERS: Corner[] = [
 ];
 
 export function CropOverlay({ frame, rect, normalizedAspect }: CropOverlayProps) {
-  const start = useSharedValue<CropRect>(rect.get());
+  const start = useSharedValue<CropRect>({ x: 0, y: 0, width: 1, height: 1 });
   const minW = MIN_SIZE_PX / frame.width;
   const minH = MIN_SIZE_PX / frame.height;
 

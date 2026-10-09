@@ -1,3 +1,10 @@
+import {
+    DEFAULT_ADJUSTMENTS,
+    exportAdjustedImage,
+    hasAdjustments,
+    type Adjustments,
+} from '@/components/editor/adjust'
+import { AdjustPreview } from '@/components/editor/AdjustPreview'
 import { CropOverlay, type Frame } from '@/components/editor/CropOverlay'
 import {
     aspectRatioFor,
@@ -15,6 +22,7 @@ import { ToolPanel } from '@/components/editor/ToolPanel'
 import { EDITOR_TOOLS, type EditorToolId } from '@/components/editor/tools'
 import { Icon } from '@/components/general/Icon'
 import { Text, useThemeColor } from '@/components/general/Themed'
+import { useImage } from '@shopify/react-native-skia'
 import { Image } from 'expo-image'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
@@ -33,6 +41,7 @@ const Editor = () => {
     const [canvasSize, setCanvasSize] = useState<ImageSize | null>(null)
     const [aspect, setAspect] = useState<CropAspectId>('free')
     const [busy, setBusy] = useState(false)
+    const [adjustments, setAdjustments] = useState<Adjustments>(DEFAULT_ADJUSTMENTS)
     const cropRect = useSharedValue<CropRect>(FULL_RECT)
 
     const text = useThemeColor({}, 'text')
@@ -44,13 +53,19 @@ const Editor = () => {
     const canUndo = history.length > 1
     const tool = EDITOR_TOOLS.find((t) => t.id === activeTool)
     const isCropping = activeTool === 'crop'
+    const isAdjusted = hasAdjustments(adjustments)
+    const skImage = useImage(currentUri)
 
     const frame = getImageFrame(canvasSize, imageSize)
     const aspectRatio = imageSize ? aspectRatioFor(aspect, imageSize) : null
     const normalizedAspect =
         aspectRatio !== null && imageSize ? (aspectRatio * imageSize.height) / imageSize.width : null
 
-    const onSelectTool = (id: EditorToolId) => {
+    const onSelectTool = async (id: EditorToolId) => {
+        if (busy) return
+        if (activeTool === 'adjust' && id !== 'adjust' && isAdjusted) {
+            await onApplyAdjustments()
+        }
         setActiveTool((current) => (current === id ? null : id))
     }
 
@@ -69,6 +84,7 @@ const Editor = () => {
         try {
             const result = await task()
             setHistory((prev) => [...prev, result.uri])
+            setAdjustments(DEFAULT_ADJUSTMENTS)
             onImageLoad({ width: result.width, height: result.height })
         } catch (error) {
             Alert.alert('Something went wrong', error instanceof Error ? error.message : String(error))
@@ -85,8 +101,15 @@ const Editor = () => {
         runManipulation(() => cropImage(currentUri, imageSize, rect))
     }
 
+    const onApplyAdjustments = async () => {
+        if (!skImage || !isAdjusted) return
+        const image = skImage
+        await runManipulation(async () => exportAdjustedImage(image, adjustments))
+    }
+
     const onUndo = () => {
         setImageSize(null)
+        setAdjustments(DEFAULT_ADJUSTMENTS)
         setHistory((prev) => prev.slice(0, -1))
     }
 
@@ -140,6 +163,9 @@ const Editor = () => {
                 contentFit="fill"
                 onLoad={(e) => onImageLoad({ width: e.source.width, height: e.source.height })}
                 />
+            {isAdjusted && frame && skImage && (
+                <AdjustPreview image={skImage} frame={frame} values={adjustments} />
+            )}
             {isCropping && frame && (
                 <CropOverlay
                     key={currentUri}
@@ -168,6 +194,14 @@ const Editor = () => {
                             onFlip: () => runManipulation(() => flipImage(currentUri)),
                             onReset: () => resetCrop(aspect, imageSize),
                             onApply: onApplyCrop,
+                        }}
+                        adjust={{
+                            values: adjustments,
+                            busy,
+                            onChange: (id, value) =>
+                                setAdjustments((prev) => ({ ...prev, [id]: value })),
+                            onReset: () => setAdjustments(DEFAULT_ADJUSTMENTS),
+                            onApply: onApplyAdjustments,
                         }}
                     />
                 </View>

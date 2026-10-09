@@ -3,6 +3,7 @@ import { Text, useThemeColor } from '@/components/general/Themed';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ADJUSTMENTS, hasAdjustments, type AdjustmentId, type Adjustments } from './adjust';
 import { CROP_ASPECTS, type CropAspectId } from './crop';
 import type { EditorTool } from './tools';
 import { ValueSlider } from './ValueSlider';
@@ -12,14 +13,6 @@ type Option = {
   label: string;
   icon?: IconName;
 };
-
-const ADJUSTMENTS: Option[] = [
-  { id: 'brightness', label: 'Brightness', icon: { ios: 'sun.max', android: 'light_mode' } },
-  { id: 'contrast', label: 'Contrast', icon: { ios: 'circle.lefthalf.filled', android: 'contrast' } },
-  { id: 'saturation', label: 'Saturation', icon: { ios: 'drop', android: 'water_drop' } },
-  { id: 'warmth', label: 'Warmth', icon: { ios: 'thermometer.medium', android: 'thermostat' } },
-  { id: 'sharpen', label: 'Sharpen', icon: { ios: 'triangle', android: 'details' } },
-];
 
 const FILTERS: (Option & { tint: string })[] = [
   { id: 'original', label: 'Original', tint: 'transparent' },
@@ -60,18 +53,27 @@ export type CropControls = {
   onApply: () => void;
 };
 
+export type AdjustControls = {
+  values: Adjustments;
+  busy: boolean;
+  onChange: (id: AdjustmentId, value: number) => void;
+  onReset: () => void;
+  onApply: () => void;
+};
+
 type ToolPanelProps = {
   tool: EditorTool;
   uri: string;
   crop: CropControls;
+  adjust: AdjustControls;
 };
 
-export function ToolPanel({ tool, uri, crop }: ToolPanelProps) {
+export function ToolPanel({ tool, uri, crop, adjust }: ToolPanelProps) {
   switch (tool.id) {
     case 'crop':
       return <CropPanel accent={tool.accent} {...crop} />;
     case 'adjust':
-      return <AdjustPanel accent={tool.accent} />;
+      return <AdjustPanel accent={tool.accent} {...adjust} />;
     case 'filters':
       return <FiltersPanel accent={tool.accent} uri={uri} />;
     case 'text':
@@ -154,25 +156,60 @@ function CropPanel({
   );
 }
 
-function AdjustPanel({ accent }: { accent: string }) {
-  const [activeId, setActiveId] = useState(ADJUSTMENTS[0].id);
-  const [values, setValues] = useState<Record<string, number>>({});
+function AdjustPanel({
+  accent,
+  values,
+  busy,
+  onChange,
+  onReset,
+  onApply,
+}: AdjustControls & { accent: string }) {
+  const [activeId, setActiveId] = useState<AdjustmentId>(ADJUSTMENTS[0].id);
+  const active = ADJUSTMENTS.find((a) => a.id === activeId) ?? ADJUSTMENTS[0];
+  const text = useThemeColor({}, 'text');
+  const card = useThemeColor({}, 'card');
+  const dirty = hasAdjustments(values);
 
   return (
     <View style={styles.column}>
-      <View style={styles.sliderWrap}>
-        <ValueSlider
-          value={values[activeId] ?? 0}
-          accent={accent}
-          onChange={(v) => setValues((prev) => ({ ...prev, [activeId]: v }))}
-        />
+      <View style={styles.sliderRow}>
+        <Pressable
+          onPress={onReset}
+          disabled={!dirty || busy}
+          accessibilityRole="button"
+          accessibilityLabel="Reset adjustments"
+          style={[styles.roundButton, { backgroundColor: card, opacity: dirty && !busy ? 1 : 0.4 }]}
+        >
+          <Icon name={{ ios: 'arrow.counterclockwise', android: 'refresh' }} color={text} size={16} />
+        </Pressable>
+        <View style={styles.flex}>
+          <ValueSlider
+            value={values[activeId]}
+            min={active.min}
+            accent={accent}
+            onChange={(v) => onChange(activeId, v)}
+          />
+        </View>
+        <Pressable
+          onPress={onApply}
+          disabled={!dirty || busy}
+          accessibilityRole="button"
+          accessibilityLabel="Apply adjustments"
+          style={[styles.roundButton, { backgroundColor: accent, opacity: dirty && !busy ? 1 : 0.4 }]}
+        >
+          {busy ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Icon name={{ ios: 'checkmark', android: 'check' }} color="#fff" size={16} />
+          )}
+        </Pressable>
       </View>
       <ChipsRow
         options={ADJUSTMENTS}
         accent={accent}
         activeId={activeId}
-        onSelect={setActiveId}
-        modified={(id) => (values[id] ?? 0) !== 0}
+        onSelect={(id) => setActiveId(id as AdjustmentId)}
+        modified={(id) => values[id as AdjustmentId] !== 0}
       />
     </View>
   );
@@ -353,8 +390,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sliderWrap: {
-    paddingHorizontal: 28,
+  flex: {
+    flex: 1,
+  },
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 14,
+    paddingHorizontal: 16,
   },
   filterItem: {
     alignItems: 'center',
