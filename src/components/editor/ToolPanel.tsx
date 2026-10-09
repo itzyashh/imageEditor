@@ -2,7 +2,8 @@ import { Icon, type IconName } from '@/components/general/Icon';
 import { Text, useThemeColor } from '@/components/general/Themed';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { CROP_ASPECTS, type CropAspectId } from './crop';
 import type { EditorTool } from './tools';
 import { ValueSlider } from './ValueSlider';
 
@@ -11,15 +12,6 @@ type Option = {
   label: string;
   icon?: IconName;
 };
-
-const CROP_RATIOS: Option[] = [
-  { id: 'free', label: 'Free' },
-  { id: 'original', label: 'Original' },
-  { id: '1:1', label: '1:1', icon: { ios: 'square', android: 'crop_square' } },
-  { id: '4:5', label: '4:5' },
-  { id: '16:9', label: '16:9' },
-  { id: '9:16', label: '9:16' },
-];
 
 const ADJUSTMENTS: Option[] = [
   { id: 'brightness', label: 'Brightness', icon: { ios: 'sun.max', android: 'light_mode' } },
@@ -58,15 +50,26 @@ const ENHANCE_OPTIONS: Option[] = [
 
 const SWATCHES = ['#ffffff', '#000000', '#FF4D6D', '#FFB703', '#22C55E', '#4F8CFF', '#8B5CF6'];
 
+export type CropControls = {
+  aspect: CropAspectId;
+  busy: boolean;
+  onAspectChange: (aspect: CropAspectId) => void;
+  onRotate: () => void;
+  onFlip: () => void;
+  onReset: () => void;
+  onApply: () => void;
+};
+
 type ToolPanelProps = {
   tool: EditorTool;
   uri: string;
+  crop: CropControls;
 };
 
-export function ToolPanel({ tool, uri }: ToolPanelProps) {
+export function ToolPanel({ tool, uri, crop }: ToolPanelProps) {
   switch (tool.id) {
     case 'crop':
-      return <CropPanel accent={tool.accent} />;
+      return <CropPanel accent={tool.accent} {...crop} />;
     case 'adjust':
       return <AdjustPanel accent={tool.accent} />;
     case 'filters':
@@ -80,27 +83,71 @@ export function ToolPanel({ tool, uri }: ToolPanelProps) {
   }
 }
 
-function CropPanel({ accent }: { accent: string }) {
+function CropPanel({
+  accent,
+  aspect,
+  busy,
+  onAspectChange,
+  onRotate,
+  onFlip,
+  onReset,
+  onApply,
+}: CropControls & { accent: string }) {
   const text = useThemeColor({}, 'text');
   const card = useThemeColor({}, 'card');
 
+  const actions: { label: string; icon: IconName; onPress: () => void }[] = [
+    { label: 'Rotate', icon: { ios: 'rotate.right', android: 'rotate_right' }, onPress: onRotate },
+    {
+      label: 'Flip',
+      icon: { ios: 'arrow.left.and.right.righttriangle.left.righttriangle.right', android: 'flip' },
+      onPress: onFlip,
+    },
+    { label: 'Reset', icon: { ios: 'arrow.counterclockwise', android: 'refresh' }, onPress: onReset },
+  ];
+
   return (
-    <View style={styles.row}>
-      <ChipsRow options={CROP_RATIOS} accent={accent} style={styles.flex} />
+    <View style={styles.column}>
+      <ChipsRow
+        options={CROP_ASPECTS}
+        accent={accent}
+        activeId={aspect}
+        onSelect={(id) => onAspectChange(id as CropAspectId)}
+      />
       <View style={styles.cropActions}>
+        {actions.map((action) => (
+          <Pressable
+            key={action.label}
+            onPress={action.onPress}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            style={({ pressed }) => [
+              styles.roundButton,
+              { backgroundColor: card, opacity: pressed || busy ? 0.5 : 1 },
+            ]}
+          >
+            <Icon name={action.icon} color={text} size={18} />
+          </Pressable>
+        ))}
         <Pressable
+          onPress={onApply}
+          disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Rotate"
-          style={[styles.roundButton, { backgroundColor: card }]}
+          accessibilityLabel="Apply crop"
+          style={({ pressed }) => [
+            styles.applyButton,
+            { backgroundColor: accent, opacity: pressed || busy ? 0.6 : 1 },
+          ]}
         >
-          <Icon name={{ ios: 'rotate.right', android: 'rotate_right' }} color={text} size={18} />
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Flip"
-          style={[styles.roundButton, { backgroundColor: card }]}
-        >
-          <Icon name={{ ios: 'arrow.left.and.right.righttriangle.left.righttriangle.right', android: 'flip' }} color={text} size={18} />
+          {busy ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Icon name={{ ios: 'checkmark', android: 'check' }} color="#fff" size={16} />
+              <Text style={styles.applyText}>Apply</Text>
+            </>
+          )}
         </Pressable>
       </View>
     </View>
@@ -255,13 +302,6 @@ function ChipsRow({
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   column: {
     gap: 12,
   },
@@ -288,9 +328,23 @@ const styles = StyleSheet.create({
   },
   cropActions: {
     flexDirection: 'row',
-    gap: 8,
-    paddingRight: 16,
-    paddingLeft: 8,
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+  },
+  applyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    borderRadius: 18,
+  },
+  applyText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   roundButton: {
     width: 36,

@@ -1,6 +1,7 @@
 import Colors from "@/constants/Colors";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { useColorScheme } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 DarkTheme.colors.primary = Colors.dark.tint;
@@ -28,6 +29,7 @@ export default function RootLayout() {
   // console.log('IOS Dark', JSON.stringify(Dark, null, 2));
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
     <SafeAreaProvider>
       <Stack
@@ -37,5 +39,6 @@ export default function RootLayout() {
       />
     </SafeAreaProvider>
     </ThemeProvider>
+    </GestureHandlerRootView>
   )
 }
