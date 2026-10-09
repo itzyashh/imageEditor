@@ -24,7 +24,7 @@ import { Icon } from '@/components/general/Icon'
 import { Text, useThemeColor } from '@/components/general/Themed'
 import { useImage } from '@shopify/react-native-skia'
 import { Image } from 'expo-image'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, View } from 'react-native'
 import { useSharedValue } from 'react-native-reanimated'
@@ -115,6 +115,7 @@ const Editor = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+        <Stack.Screen options={{ gestureEnabled: false }} />
         <View style={styles.topBar}>
             <View style={styles.topBarGroup}>
                 <Pressable
